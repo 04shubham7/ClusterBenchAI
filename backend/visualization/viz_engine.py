@@ -192,15 +192,15 @@ class VisualizationEngine:
         corr_matrix = df_top.corr().fillna(0).round(3).values.tolist()
 
         # 2. Cluster Centroid / Profile Heatmap
-        unique_labels = sorted([l for l in np.unique(labels) if l != -1])
+        unique_labels = sorted([int(l) for l in np.unique(labels) if l != -1])
         cluster_profiles = []
         for c in unique_labels:
             mean_vals = X_top[labels == c].mean(axis=0)
             cluster_profiles.append([round(float(v), 3) for v in mean_vals])
 
         return {
-            "feature_names": top_features,
-            "correlation_matrix": corr_matrix,
+            "feature_names": [str(f) for f in top_features],
+            "correlation_matrix": [[float(val) for val in row] for row in corr_matrix],
             "cluster_ids": unique_labels,
             "cluster_profiles": cluster_profiles
         }
@@ -236,10 +236,10 @@ class VisualizationEngine:
             Z = linkage(X_sub, method='ward')
             ddata = dendrogram(Z, no_plot=True)
             return {
-                "icoord": ddata['icoord'],
-                "dcoord": ddata['dcoord'],
-                "ivl": ddata['ivl'],
-                "leaves": ddata['leaves']
+                "icoord": [[float(coord) for coord in stem] for stem in ddata['icoord']],
+                "dcoord": [[float(coord) for coord in stem] for stem in ddata['dcoord']],
+                "ivl": [str(x) for x in ddata['ivl']],
+                "leaves": [int(x) for x in ddata['leaves']]
             }
         except Exception as e:
             return {"error": str(e)}

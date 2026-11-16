@@ -1,21 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import OverviewSection from './components/OverviewSection';
 import DatasetManager from './components/DatasetManager';
 import AlgorithmLab from './components/AlgorithmLab';
 import BenchmarkView from './components/BenchmarkView';
-import LeaderboardView from './components/LeaderboardView';
 import VisualizationsGallery from './components/VisualizationsGallery';
 import ReportExportCenter from './components/ReportExportCenter';
 import ClusterCanvasBackground from './components/ClusterCanvasBackground';
+import {
+  fetchDatasets,
+  runBenchmark,
+  checkBackendHealth,
+  getApiUrl
+} from './api';
+
+// Preloaded metadata fallback if backend is booting up
+const DEFAULT_FALLBACK_DATASETS = [
+  {
+    id: 'mushroom',
+    name: 'Mushroom (UCI Categorical)',
+    description: 'UCI repository dataset with 8,124 instances and 22 nominal features categorizing mushrooms into edible and poisonous partitions.',
+    num_rows: 8124,
+    num_cols: 22,
+    default_k: 2
+  },
+  {
+    id: 'soybean',
+    name: 'Soybean Disease (UCI)',
+    description: 'Biological plant pathology dataset with 35 categorical diagnostic symptoms classifying soybean crop infections.',
+    num_rows: 307,
+    num_cols: 35,
+    default_k: 4
+  },
+  {
+    id: 'synthetic_blobs',
+    name: 'Synthetic Manifold Topology',
+    description: 'Controlled multi-cluster synthetic benchmark with Gaussian and non-linear manifold topologies.',
+    num_rows: 1500,
+    num_cols: 10,
+    default_k: 3
+  }
+];
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true);
+  // Theme state with localStorage persistence
+  const [darkMode, setDarkMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('clusterbench_theme');
+      if (saved !== null) return saved === 'dark';
+    } catch {
+      // ignore
+    }
+    return true; // Default to dark theme
+  });
+
   const [currentTab, setCurrentTab] = useState('overview');
   
   // Datasets state
-  const [datasets, setDatasets] = useState([]);
+  const [datasets, setDatasets] = useState(DEFAULT_FALLBACK_DATASETS);
   const [activeDatasetId, setActiveDatasetId] = useState('mushroom');
   
   // Benchmark state
@@ -23,34 +66,55 @@ export default function App() {
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [isPreprocessing, setIsPreprocessing] = useState(false);
 
-  // Sync dark mode with document root
+  // Backend connection state
+  const [backendStatus, setBackendStatus] = useState({
+    connected: false,
+    checking: true,
+    error: null
+  });
+
+  // Sync theme with document element and localStorage
   useEffect(() => {
+    const root = document.documentElement;
     if (darkMode) {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
+      try {
+        localStorage.setItem('clusterbench_theme', 'dark');
+      } catch {}
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
+      try {
+        localStorage.setItem('clusterbench_theme', 'light');
+      } catch {}
     }
   }, [darkMode]);
 
-  // Load datasets list on mount
-  const loadDatasets = async () => {
+  // Check health and load datasets
+  const loadDatasetsFromBackend = useCallback(async () => {
+    setBackendStatus((s) => ({ ...s, checking: true }));
     try {
-      const res = await fetch('/api/datasets');
-      const data = await res.json();
-      if (data.datasets && data.datasets.length > 0) {
-        setDatasets(data.datasets);
-        if (!activeDatasetId) {
-          setActiveDatasetId(data.datasets[0].id);
+      const health = await checkBackendHealth();
+      if (health.online) {
+        setBackendStatus({ connected: true, checking: false, error: null });
+        const data = await fetchDatasets();
+        if (data.datasets && data.datasets.length > 0) {
+          setDatasets(data.datasets);
+          if (!activeDatasetId) {
+            setActiveDatasetId(data.datasets[0].id);
+          }
         }
+      } else {
+        setBackendStatus({ connected: false, checking: false, error: health.error || 'Server unreachable' });
       }
     } catch (err) {
-      console.error('Failed to load datasets:', err);
+      setBackendStatus({ connected: false, checking: false, error: err.message });
+      console.warn('Backend unavailable, using preset datasets fallback:', err.message);
     }
-  };
+  }, [activeDatasetId]);
 
   useEffect(() => {
-    loadDatasets();
-  }, []);
+    loadDatasetsFromBackend();
+  }, [loadDatasetsFromBackend]);
 
   // Run benchmark for the active dataset
   const triggerBenchmark = async (options = {}) => {
@@ -62,14 +126,9 @@ export default function App() {
         metric_weights: options.metric_weights || null
       };
 
-      const res = await fetch('/api/cluster/benchmark', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Benchmark failed');
+      const data = await runBenchmark(payload);
       setBenchmarkData(data);
+      setBackendStatus((s) => ({ ...s, connected: true, error: null }));
     } catch (err) {
       console.error('Benchmark execution failed:', err);
     } finally {
@@ -86,22 +145,22 @@ export default function App() {
 
   // File Download Handlers
   const handleDownloadPdf = () => {
-    window.open('/api/reports/pdf', '_blank');
+    window.open(getApiUrl('/api/reports/pdf'), '_blank');
   };
 
   const handleDownloadCsv = () => {
-    window.open('/api/reports/csv', '_blank');
+    window.open(getApiUrl('/api/reports/csv'), '_blank');
   };
 
   const handleDownloadClustered = () => {
-    window.open('/api/reports/export-clusters', '_blank');
+    window.open(getApiUrl('/api/reports/export-clusters'), '_blank');
   };
 
-  const activeDatasetObj = datasets.find((d) => d.id === activeDatasetId);
+  const activeDatasetObj = datasets.find((d) => d.id === activeDatasetId) || datasets[0];
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#070913] text-slate-900 dark:text-slate-100 transition-colors relative overflow-hidden selection:bg-cyan-500 selection:text-black">
-      {/* Dynamic Clustering Particle & Aurora Mesh Background */}
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#09090B] text-zinc-900 dark:text-zinc-100 transition-colors duration-150 relative overflow-hidden selection:bg-blue-600 selection:text-white">
+      {/* Precision Mathematical Canvas & Coordinate Texture */}
       <ClusterCanvasBackground isDark={darkMode} />
 
       <Navbar
@@ -111,10 +170,17 @@ export default function App() {
         onDownloadPdf={handleDownloadPdf}
         onDownloadCsv={handleDownloadCsv}
         isBenchmarking={isBenchmarking}
+        backendStatus={backendStatus}
+        onRetryConnect={loadDatasetsFromBackend}
       />
 
       <div className="flex-1 flex overflow-hidden relative z-10">
-        <Sidebar currentTab={currentTab} setCurrentTab={setCurrentTab} />
+        <Sidebar
+          currentTab={currentTab}
+          setCurrentTab={setCurrentTab}
+          backendStatus={backendStatus}
+          onRetryConnect={loadDatasetsFromBackend}
+        />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative z-10">
           {currentTab === 'overview' && <OverviewSection />}
@@ -125,7 +191,7 @@ export default function App() {
               activeDatasetId={activeDatasetId}
               setActiveDatasetId={setActiveDatasetId}
               onUploadSuccess={(newId) => {
-                loadDatasets();
+                loadDatasetsFromBackend();
                 setActiveDatasetId(newId);
               }}
               onPreprocessingDone={(report) => {
@@ -150,13 +216,6 @@ export default function App() {
               benchmarkData={benchmarkData}
               onRunBenchmark={triggerBenchmark}
               isBenchmarking={isBenchmarking}
-            />
-          )}
-
-          {currentTab === 'leaderboard' && (
-            <LeaderboardView
-              benchmarkData={benchmarkData}
-              activeDatasetId={activeDatasetId}
             />
           )}
 
