@@ -4,14 +4,16 @@ import {
   Database,
   Sliders,
   BarChart3,
-  Trophy,
   PieChart,
-  FileDown,
-  Cpu,
-  Sparkles
+  FileDown
 } from 'lucide-react';
 
-export default function Sidebar({ currentTab, setCurrentTab }) {
+export default function Sidebar({
+  currentTab,
+  setCurrentTab,
+  backendStatus,
+  onRetryConnect
+}) {
   const navItems = [
     {
       id: 'overview',
@@ -23,25 +25,19 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
       id: 'dataset',
       label: 'Data & Pipeline',
       icon: Database,
-      tag: 'Clean & Scale'
+      tag: 'Preprocess'
     },
     {
       id: 'lab',
       label: 'Algorithm Lab',
       icon: Sliders,
-      tag: '2D / 3D Tuning'
+      tag: 'Interactive'
     },
     {
       id: 'benchmark',
       label: 'Benchmark Suite',
       icon: BarChart3,
-      tag: 'Compare All'
-    },
-    {
-      id: 'leaderboard',
-      label: 'Leaderboard',
-      icon: Trophy,
-      tag: 'Podium'
+      tag: 'Compare'
     },
     {
       id: 'gallery',
@@ -53,23 +49,23 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
       id: 'export',
       label: 'Export Center',
       icon: FileDown,
-      tag: 'PDF & CSV'
+      tag: 'Reports'
     }
   ];
 
   return (
-    <aside className="w-64 border-r border-slate-200/70 dark:border-white/[0.08] bg-white/60 dark:bg-[#0c1021]/60 backdrop-blur-xl p-4 flex flex-col justify-between shrink-0 transition-colors z-20">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-2.5">
-          <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-            Control Center
+    <aside className="w-60 border-r border-zinc-200 dark:border-zinc-800 bg-[#FAFAFA] dark:bg-[#09090B] p-3 flex flex-col justify-between shrink-0 transition-colors duration-150 z-20">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-2 pt-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-mono">
+            Modules
           </span>
-          <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
             v1.0
           </span>
         </div>
 
-        <nav className="space-y-1.5">
+        <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
@@ -77,25 +73,25 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
               <button
                 key={item.id}
                 onClick={() => setCurrentTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition-all duration-200 cursor-pointer group ${
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-left transition-all duration-150 cursor-pointer ${
                   isActive
-                    ? 'bg-gradient-to-r from-cyan-500/15 via-violet-500/10 to-transparent border-l-2 border-cyan-400 text-cyan-600 dark:text-cyan-400 font-bold shadow-[0_0_20px_rgba(6,182,212,0.1)]'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/70 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-white'
+                    ? 'bg-white dark:bg-zinc-900 text-zinc-950 dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800 shadow-xs font-semibold'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-900/50 hover:text-zinc-900 dark:hover:text-zinc-200'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <Icon
-                    className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${
-                      isActive ? 'text-cyan-500 dark:text-cyan-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                    className={`w-4 h-4 shrink-0 ${
+                      isActive ? 'text-blue-600 dark:text-blue-400' : 'text-zinc-400 dark:text-zinc-500'
                     }`}
                   />
-                  <span className="text-xs">{item.label}</span>
+                  <span className="text-xs truncate">{item.label}</span>
                 </div>
                 <span
-                  className={`text-[9.5px] font-mono px-2 py-0.5 rounded-md transition-colors ${
+                  className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded transition-colors tabular-nums ${
                     isActive
-                      ? 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 font-bold border border-cyan-500/30'
-                      : 'bg-slate-100 dark:bg-white/[0.04] text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-400'
+                      ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60'
+                      : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-400 dark:text-zinc-500'
                   }`}
                 >
                   {item.tag}
@@ -106,24 +102,31 @@ export default function Sidebar({ currentTab, setCurrentTab }) {
         </nav>
       </div>
 
-      {/* Cyber Platform Status Banner */}
-      <div className="p-3 rounded-2xl bg-slate-100/80 dark:bg-[#070913]/80 border border-slate-200/80 dark:border-white/[0.08] space-y-2">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-300">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+      {/* Live Backend & System Status */}
+      <div className="p-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2 shadow-xs">
+        <div className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 font-medium text-zinc-700 dark:text-zinc-300">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${backendStatus?.connected ? 'bg-emerald-500' : 'bg-rose-500'}`} />
             </span>
-            <span>Clustering Engine</span>
+            <span>FastAPI Core</span>
           </span>
-          <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-            READY
-          </span>
+          <button
+            onClick={onRetryConnect}
+            className="text-[10px] font-mono font-semibold cursor-pointer transition"
+            title="Click to re-check backend connection"
+          >
+            {backendStatus?.connected ? (
+              <span className="text-emerald-600 dark:text-emerald-400">ONLINE</span>
+            ) : (
+              <span className="text-rose-500 hover:text-rose-600 hover:underline">RETRY</span>
+            )}
+          </button>
         </div>
 
-        <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 pt-1 border-t border-slate-200/60 dark:border-white/[0.05] font-mono">
-          <span>Latency: ~4.8ms</span>
-          <span>GPU: WebGL</span>
+        <div className="flex items-center justify-between text-[10px] text-zinc-400 dark:text-zinc-500 pt-1.5 border-t border-zinc-100 dark:border-zinc-800/80 font-mono tabular-nums">
+          <span>Port: 8000</span>
+          <span>WebGL: Active</span>
         </div>
       </div>
     </aside>
